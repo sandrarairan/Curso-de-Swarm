@@ -97,4 +97,92 @@ docker service logs -f nombreServicio
 
 // Eliminar servicio
 docker service rm nombreServicio
+https://docs.docker.com/engine/swarm/how-swarm-mode-works/services/
+
+# Un playground de docker swarm gratuito: play-with-docker
+¡Play with docker es una herramienta de otro mundo! Te permitirá colaborar entre distintos usuarios en una mismas sesión de docker, y lo mejor, ¡puedes incluir tu propia terminal!
+https://labs.play-with-docker.com/
+
+1. Ingresa a play. docker
+2. + ADD NEW INSTANCE
+3. Se copia el ssh que paarece en play-docker y o pega en su terminal
+
+# Docker Swarm multinodo
+// iniciar docker swarm
+docker swarm init
+// iniciar docker swarm en caso de tener mas de una interfaz de red
+docker swarm init --advertise-addr [“ip de la interfaz donde va a escuchar peticiones para unirse al swarm”]
+- Se debe crear 2 nodos con  + ADD NEW INSTANCE
+- Para crear worker hay que pegar o add a worker to this swarm, run the following command:
+
+    docker swarm join --token 
+    en el node2 y node 3 
+// ver nodos del swarm *solo se puede visualizar desde un docker swarm manager, esdecir node 1
+// Todo lo relativo al estado del swarm, a la administracion del swarm y todo lo que tiene que ver con el swarm en si lo van a manejar exclusivamente los managers
+docker node ls
+- manager se corre
+docker service create --name pinger alpine ping www.google.com
+docker service ls
+
+## Administrando Servicios
+# Administrando servicios en escala
+Comandos de la clase, con el ejemplo del servicio pinger
+
+- Cambia el numero de tareas
+docker service scale pinger=5
+
+- Ver las tareas del servicio
+docker service ps pinger
+
+- Ver los logs del servicio
+docker service logs -f pinger
+
+#-Ver la configuración del servicio
+docker service inspect pinger
+
+- actualizar alguna configuración del servicio
+docker service update --args "ping www.amazon.com" pinger
+
+- realiza rollback o cambia al spec anterior 
+docker service rollback pinger
+
+# Controlando el despliegue de servicios
+Comandos usados en la clase con el servicio ejemplo pinger
+
+-  Actualizar las replicas de un servicio
+docker service update --replicas=20 pinger
+
+-  Actualizar paralelismo y orden dela configuracióndeupdateen el servicio pinger
+docker service update --update-parallelism 4 --update-order start-first pinger
+
+ - Actualizar accion en fallo y radio maximo de falla dela configuracióndeupdateen el servicio pinger
+docker service update --update-failure-action rollback --update-max-failure-ratio 0.5 pinger
+
+ - Actualizar paralelismo dela configuracion de rollback en el servicio de pinger
+docker service update --rollback-parallelism 0 pinger
+
+# Exponiendo aplicaciones al mundo exterior
+https://github.com/platzi/swarm
+
+ swarm git:(master) cd hostname
+➜ hostname git:(master) docker build -t usuariodeDocker/swarm-hostname .
+➜ hostname git:(master) docker run --rm -p 3000:3000 s/swarm-hostname
+Server listening on port 3000!
+
+- ➜ hostname git:(master) docker push usuariodeDocker/swarm-hostname
+- se ingresa a labs.play-with-docker se da click en la llave 3 MANAGER AND 2 WORKRES
+- Les dejo el comando para lanzar la aplicación
+- Manager docker node ls
+
+docker service create -d --name app --publish 3000:3000 --replicas=3 usuariodeDocker/swarm-hostname
+
+- docker service ps app
+
+## Swarm avanzado
+# El Routing Mesh
+Routing Mesh nos ayuda a que, teniendo un servicio escalado en swarm que tiene mas nodos que servicios y esos servicios están expuestos en un puerto; cuando hacemos un request a un servicio en ese puerto de alguna manera la petición llega y no se pierden en algún nodo que no puede contenerlo en ese puerto o en un contenedor.
+
+Routing Mesh ayuda a llevar la petición y que esta no se pierda si la cantidad de los contenedores es diferente a la cantidad de nodos.
+https://docs.docker.com/engine/swarm/ingress/
+
 
