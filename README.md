@@ -162,7 +162,7 @@ docker service update --update-failure-action rollback --update-max-failure-rati
 docker service update --rollback-parallelism 0 pinger
 
 # Exponiendo aplicaciones al mundo exterior
-https://github.com/platzi/swarm
+
 
  swarm git:(master) cd hostname
 ➜ hostname git:(master) docker build -t usuariodeDocker/swarm-hostname .
@@ -184,5 +184,156 @@ Routing Mesh nos ayuda a que, teniendo un servicio escalado en swarm que tiene m
 
 Routing Mesh ayuda a llevar la petición y que esta no se pierda si la cantidad de los contenedores es diferente a la cantidad de nodos.
 https://docs.docker.com/engine/swarm/ingress/
+
+manager:
+- docker service scale app=6
+- docker service ps app
+- vamos worker2 
+docker ps
+docker network ls
+ (la red ingress)
+ 
+ # Restricciones de despliegue
+  (donde:
+–constraint-add node.role => indica el tipo de nodo donde quiero reubicar
+
+
+ docker service create -d --name viz -p 8080:8080 --constraint=node.role==manager --mount=type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock dockersamples/visualizer
+ 
+ - docker service ps viz
+ 
+se va aa https://labs.play-with-docker.com y en el port 8080 
+
+- Comando para reubicar los servicios para que sean ejecutados solo en los workers
+
+docker service update --constraint-add node.role==worker --update-parallelism=0 app
+donde:
+–constraint-add node.role => indica el tipo de nodo donde quiero reubicar
+–update-parallelism=0 => indica que se harán todos en simultaneo
+
+# Disponibilidad de nodos
+En el visualizer podemos ver que todas las tareas siguen corriendo en el "“worker 1"”, esto sucede porque el planificador de Docker Swarm no va a replanificar o redistribuir la carga de un servicio o de contenedores a menos que tenga que hacerlo; para solucionar esto, debemos forzar un redeployment o una actualización que se logra cambiando el valor de una variable que no sirva para nada.
+
+docker service update -d --env-add UNA_VARIABLE=de-entorno --update-parallelism=0 app
+
+docker service ps app
+
+-- 
+docker node update --availability drain worker2
+
+# Networking y service discovery
+vamos a ver como es el networking al momento de trabajar con swarm, vamos a poder inspeccionar que tenemos en la red. Todo esto, utilizando el repositorio que encuentras en los enlaces del curso
+
+https://docs.docker.com/network/overlay/
+
+- docker create --driver overlay app-net
+docker network ls
+docker network inspect app-net
+
+- Vamos a ir a la terminal y la carpeta networing
+➜ networking git:(master) docker build -t s/swarm-networing
+➜ networking git:(master) docker push s/swarm-networking
+
+- volvemos a swarm manager
+docker service create -d --name db --network app-net mongo
+
+- docker service ps db
+- docker service create -d --name app --network app-net -p 3000:3000 s/swarm-networking
+- docker service ls
+- docker service update --env--add MONGO_URL=mongodb://db/test app
+
+- - Vamos aworker 1
+docker ps
+docker exec -it "id conainier" bash
+**PARA UNA APLICACION PRODUCTIVA NO USAR SWARM PARA BD
+
+# Docker Swarm stacks
+Con Docker Swarm Stacks (un archivo) se puede controlar cómo se van a despliegan los servicios utilizando los stacks. Siempre es bueno utilizar un archivo porque este puede ser versionado (Git) y se tiene un archivo que va a describir la arquitectura de la aplicación.
+
+docker service rm app db
+docker network rm app-net
+- vamos manager
+vim stackfile.yml
+```
+version: "3"
+
+services:
+  app:
+    image: gvilarino/swarm-networking
+    environment:
+      MONGO_URL: "mongodb://db:27017/test"
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    deploy:
+        placement:
+          contraints:[node.role==worker]
+
+  db:
+    image: mongo
+  ```
+  - docker stack deploy --compose-file stackfile.yml app
+  CREA CREATING NETWORK app_default
+  creating service app_app
+  creating service app_db
+  - docker service ls
+  - docker stack ls
+  - docker stack ps app
+  - docker stack services app
+  
+  - En el archivo stackfile.yml
+     deploy:
+        placement:
+          contraints:[node.role==worker]
+          
+   - docker stack deploy --compose-file stackfile.yml app
+   - docker stack rm app
+   
+ # Reverse proxy: muchas aplicaciones, un sólo dominio
+Reverse proxy es una técnica, es un servicio que está escuchando y que toma una decisión con la petición que esta entrando y hace un proxy hacia uno de los servicios que tiene que atender esa petición.
+
+Existe una herramienta llamada traefik, el cual es un intermediario entre las peticiones que vienen del internet a nuestra infraestructura.
+
+https://traefik.io/
+- vamos swarm Manager:
+docker network create --driver overlay proxy-net
+
+docker service create --name proxy --constraint=node==manager -p 80:80 -p 9000:8080 --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock --network proxy-net traefik --docker --docker.swarm.Mode --dokcer.domain=guido.com --docker.watch --api
+
+- docker service create --name app1 --network proxy-net --label traefic.prt=3000 s/swarm-hostname
+- curl -H "Host: app1.guido.com" http://localhost
+
+- docker service create --name app2 --network proxy-net --label traefic.prt=3000 s/swarm-hostname
+- curl -H "Host: app2.guido.com" http://localhost
+
+- docker service update --image  s/swarm-networking app2
+
+
+## Swarm productivo
+# Arquitectura de un swarm productivo
+https://www.freecodecamp.org/news/in-search-of-an-understandable-consensus-algorithm-a-summary-4bc294c97e0d/
+
+https://success.docker.com/article/using-contraints-and-labels-to-control-the-placement-of-containers
+# Administración remota de swarm productivo
+Las herramientas de administración en Docker Swarm deben persistir en disco (su estado interno, la administración) y la mejor manera de almacenar cosas en Docker son los volúmenes.
+
+En esta clase aprenderemos una forma fácil simple e intituiva de administrar nuestro docker swarm de manera remota. No es la única que existe, así que te invitamos a probar y a dejarnos en los comentarios otras formas que encuentres.
+
+https://www.portainer.io/
+
+manager:
+- docker volume create portainer_data
+- docker service create --name portainer -p 9000:9000 --constraint node.role==manager
+–mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock
+–mount type=volume,src=portainer_data,dst=/data portainer/portainer
+-H unix:///var/run/docker.sock
+
+
+
+# Consideraciones adicionales para un swarm produtivo
+https://docs.docker.com/config/containers/logging/configure/
+
+
 
 
