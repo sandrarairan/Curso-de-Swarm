@@ -120,10 +120,10 @@ docker swarm init --advertise-addr [“ip de la interfaz donde va a escuchar pet
 // ver nodos del swarm *solo se puede visualizar desde un docker swarm manager, esdecir node 1
 // Todo lo relativo al estado del swarm, a la administracion del swarm y todo lo que tiene que ver con el swarm en si lo van a manejar exclusivamente los managers
 docker node ls
-- manager se corre
+- manager se corre multinodo
 docker service create --name pinger alpine ping www.google.com
 docker service ls
-
+docker service ps pinger
 ## Administrando Servicios
 # Administrando servicios en escala
 Comandos de la clase, con el ejemplo del servicio pinger
@@ -177,6 +177,7 @@ Server listening on port 3000!
 docker service create -d --name app --publish 3000:3000 --replicas=3 usuariodeDocker/swarm-hostname
 
 - docker service ps app
+- desde la terminal en la cartpeta hostname:  curl y la url que esta en play with docker
 
 ## Swarm avanzado
 # El Routing Mesh
